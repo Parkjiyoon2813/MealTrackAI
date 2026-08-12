@@ -3,6 +3,21 @@ import sqlite3
 from datetime import date, datetime
 import calendar
 
+# ---------------- DESIGN SYSTEM ----------------
+
+BG_COLOR = "#0B0818"          # Main background
+CARD_COLOR = "#161126"        # Cards / panels
+CARD_HOVER = "#21183A"        # Hover state
+PRIMARY_COLOR = "#7C3AED"     # Main purple
+PRIMARY_HOVER = "#6D28D9"     # Darker purple
+SUCCESS_COLOR = "#22C55E"     # Completed meals
+WARNING_COLOR = "#F59E0B"     # Spending / attention
+DANGER_COLOR = "#F43F5E"      # Missed / warning
+TEXT_COLOR = "#F8FAFC"        # Main text
+MUTED_TEXT = "#A1A1AA"        # Secondary text
+BORDER_COLOR = "#2D2445"      # Subtle borders
+
+
 connection = sqlite3.connect("meals.db")
 cursor = connection.cursor()
 
@@ -27,6 +42,12 @@ except sqlite3.OperationalError:
     pass
 
 bill = 0
+
+# Dashboard card references
+dashboard_bill_value = None
+dashboard_meals_value = None
+dashboard_month_value = None
+dashboard_average_value = None
 #-------------------functions----------------------
 
 def save_record():
@@ -114,6 +135,10 @@ def load_today_record():
                 )
 
         # Load saved bill
+        global bill
+
+        bill = saved_bill
+
         bill_label.configure(
             text=f"₹{saved_bill}"
         )
@@ -124,6 +149,7 @@ def load_today_record():
         meal_count_label.configure(
             text=f"Meals Completed: {completed_meals} / {len(meals)}"
         )
+    update_dashboard_cards()
 
 def show_history():
 
@@ -393,6 +419,65 @@ def show_monthly_summary():
 
     close_button.pack(pady=20)
 
+
+def update_dashboard_cards():
+
+    today = date.today()
+
+    # Today's values
+    completed_meals = sum(
+        checkboxes[meal].get()
+        for meal in meals
+    )
+
+    # Monthly values
+    current_month = today.strftime("%m")
+    current_year = today.strftime("%Y")
+
+    cursor.execute(
+        """
+        SELECT bill
+        FROM meals
+        WHERE substr(date, 4, 2) = ?
+        AND substr(date, 7, 4) = ?
+        """,
+        (current_month, current_year)
+    )
+
+    monthly_records = cursor.fetchall()
+
+    total_month_spent = sum(
+        record[0] for record in monthly_records
+    )
+
+    days_recorded = len(monthly_records)
+
+    if days_recorded > 0:
+        average_daily = total_month_spent / days_recorded
+    else:
+        average_daily = 0
+
+    # Update dashboard
+    if dashboard_bill_value:
+        dashboard_bill_value.configure(
+            text=f"₹{bill}"
+        )
+
+    if dashboard_meals_value:
+        dashboard_meals_value.configure(
+            text=f"{completed_meals} / {len(meals)}"
+        )
+
+    if dashboard_month_value:
+        dashboard_month_value.configure(
+            text=f"₹{total_month_spent}"
+        )
+
+    if dashboard_average_value:
+        dashboard_average_value.configure(
+            text=f"₹{average_daily:.2f}"
+        )
+
 def update_bill():
 
     global bill
@@ -424,7 +509,7 @@ def update_bill():
     meal_count_label.configure(
         text=f"Meals Completed: {completed_meals} / {len(meals)}"
     )
-
+    update_dashboard_cards()
 
 
 meals = {
@@ -437,11 +522,9 @@ checkboxes = {}
 # set apprearance mode
 ctk.set_appearance_mode("dark")
 
-# set default color theme
-ctk.set_default_color_theme("blue")
-
 # Create main application window
 app = ctk.CTk()
+app.configure(fg_color=BG_COLOR)
 
 # set window title
 app.title("MealTrack AI")
@@ -450,21 +533,43 @@ app.title("MealTrack AI")
 app.geometry("600x400")
 
 # ------------HEADER FRAME-----------
-header_frame = ctk.CTkFrame(app)
+header_frame = ctk.CTkFrame(
+    app,
+    fg_color=CARD_COLOR,
+    corner_radius=18,
+    border_width=1,
+    border_color=BORDER_COLOR
+)
 
 header_frame.pack(fill = "x", padx = 20, pady = 20)
 
-# App title
-title_label = ctk.CTkLabel(
-    header_frame,
-    text = "🍽 MealTrack AI",
-    font = ("Arial", 28, "bold")
+# ---------------- HEADER CONTENT ----------------
 
+header_content = ctk.CTkFrame(
+    header_frame,
+    fg_color="transparent"
 )
 
-title_label.pack(pady = (15,5))
+header_content.pack(
+    fill="x",
+    padx=25,
+    pady=20
+)
 
-# Greeting
+
+# Left side
+header_left = ctk.CTkFrame(
+    header_content,
+    fg_color="transparent"
+)
+
+header_left.pack(
+    side="left",
+    fill="both",
+    expand=True
+)
+
+# Determine greeting based on current time
 
 current_hour = datetime.now().hour
 
@@ -476,107 +581,419 @@ else:
     greeting = "Good Evening"
 
 
-greeting_label = ctk.CTkLabel(
-    header_frame,
-    text=greeting,
-    font=("Arial", 18)
-)
+# Create today's date text
 
-greeting_label.pack()
-
-# date
 today = date.today()
-
 date_text = today.strftime("%A, %d %B %Y")
-
-date_label = ctk.CTkLabel(
-    header_frame,
-    text=date_text,
-    font=("Arial", 14)
+# Greeting
+greeting_label = ctk.CTkLabel(
+    header_left,
+    text=f"{greeting}, Sowmya! 👋",
+    font=("Arial", 28, "bold"),
+    text_color=TEXT_COLOR
 )
 
-date_label.pack(pady = (5,15))
+greeting_label.pack(
+    anchor="w"
+)
 
 
+# Subtitle
+subtitle_label = ctk.CTkLabel(
+    header_left,
+    text="Track your meals, control your spending, live better.",
+    font=("Arial", 14),
+    text_color=MUTED_TEXT
+)
+
+subtitle_label.pack(
+    anchor="w",
+    pady=(5, 0)
+)
+
+
+# Right side
+header_right = ctk.CTkFrame(
+    header_content,
+    fg_color=PRIMARY_COLOR,
+    corner_radius=12
+)
+
+header_right.pack(
+    side="right",
+    padx=(20, 0),
+    pady=5
+)
+
+
+# Date
+date_label = ctk.CTkLabel(
+    header_right,
+    text=date_text,
+    font=("Arial", 14, "bold"),
+    text_color=TEXT_COLOR
+)
+
+date_label.pack(
+    padx=18,
+    pady=10
+)
+
+# ---------------- DASHBOARD SUMMARY ----------------
+
+dashboard_frame = ctk.CTkFrame(
+    app,
+    fg_color="transparent"
+)
+
+dashboard_frame.pack(
+    fill="x",
+    padx=20,
+    pady=(0, 10)
+)
+
+
+# Today's Bill Card
+bill_card = ctk.CTkFrame(
+    dashboard_frame,
+    fg_color=CARD_COLOR,
+    corner_radius=16,
+    border_width=1,
+    border_color=BORDER_COLOR
+)
+
+bill_card.pack(
+    side="left",
+    fill="both",
+    expand=True,
+    padx=5
+)
+
+ctk.CTkLabel(
+    bill_card,
+    text="Today's Bill",
+    font=("Arial", 13),
+    text_color=MUTED_TEXT
+).pack(
+    anchor="w",
+    padx=15,
+    pady=(15, 3)
+)
+
+dashboard_bill_value = ctk.CTkLabel(
+    bill_card,
+    text="₹0",
+    font=("Arial", 24, "bold"),
+    text_color=TEXT_COLOR
+)
+
+dashboard_bill_value.pack(
+    anchor="w",
+    padx=15,
+    pady=(0, 15)
+)
+
+
+# Meals Completed Card
+meals_card = ctk.CTkFrame(
+    dashboard_frame,
+    fg_color=CARD_COLOR,
+    corner_radius=16,
+    border_width=1,
+    border_color=BORDER_COLOR
+)
+
+meals_card.pack(
+    side="left",
+    fill="both",
+    expand=True,
+    padx=5
+)
+
+ctk.CTkLabel(
+    meals_card,
+    text="Meals Completed",
+    font=("Arial", 13),
+    text_color=MUTED_TEXT
+).pack(
+    anchor="w",
+    padx=15,
+    pady=(15, 3)
+)
+
+dashboard_meals_value = ctk.CTkLabel(
+    meals_card,
+    text="0 / 3",
+    font=("Arial", 24, "bold"),
+    text_color=SUCCESS_COLOR
+)
+
+dashboard_meals_value.pack(
+    anchor="w",
+    padx=15,
+    pady=(0, 15)
+)
+
+
+# This Month Card
+month_card = ctk.CTkFrame(
+    dashboard_frame,
+    fg_color=CARD_COLOR,
+    corner_radius=16,
+    border_width=1,
+    border_color=BORDER_COLOR
+)
+
+month_card.pack(
+    side="left",
+    fill="both",
+    expand=True,
+    padx=5
+)
+
+ctk.CTkLabel(
+    month_card,
+    text="This Month",
+    font=("Arial", 13),
+    text_color=MUTED_TEXT
+).pack(
+    anchor="w",
+    padx=15,
+    pady=(15, 3)
+)
+
+dashboard_month_value = ctk.CTkLabel(
+    month_card,
+    text="₹0",
+    font=("Arial", 24, "bold"),
+    text_color=WARNING_COLOR
+)
+
+dashboard_month_value.pack(
+    anchor="w",
+    padx=15,
+    pady=(0, 15)
+)
+
+
+# Average / Day Card
+average_card = ctk.CTkFrame(
+    dashboard_frame,
+    fg_color=CARD_COLOR,
+    corner_radius=16,
+    border_width=1,
+    border_color=BORDER_COLOR
+)
+
+average_card.pack(
+    side="left",
+    fill="both",
+    expand=True,
+    padx=5
+)
+
+ctk.CTkLabel(
+    average_card,
+    text="Avg / Day",
+    font=("Arial", 13),
+    text_color=MUTED_TEXT
+).pack(
+    anchor="w",
+    padx=15,
+    pady=(15, 3)
+)
+
+dashboard_average_value = ctk.CTkLabel(
+    average_card,
+    text="₹0.00",
+    font=("Arial", 24, "bold"),
+    text_color=PRIMARY_COLOR
+)
+
+dashboard_average_value.pack(
+    anchor="w",
+    padx=15,
+    pady=(0, 15)
+)
 
 # ---------------- MEALS FRAME ----------------
-meals_frame = ctk.CTkFrame(app)
+meals_frame = ctk.CTkFrame(
+    app,
+    fg_color=CARD_COLOR,
+    corner_radius=18,
+    border_width=1,
+    border_color=BORDER_COLOR
+)
 meals_frame.pack(fill="x", padx=20, pady=10)
-# Meals Heading
+
+
+# ---------------- TODAY'S MEALS ----------------
+
 meals_heading = ctk.CTkLabel(
     meals_frame,
     text="Today's Meals",
-    font=("Arial", 18, "bold")
+    font=("Arial", 20, "bold"),
+    text_color=TEXT_COLOR
 )
-meals_heading.grid(row=0, column=0, columnspan=2, padx=20, pady=(15,10), sticky="w")
 
-meal_heading = ctk.CTkLabel(
+meals_heading.pack(
+    anchor="w",
+    padx=20,
+    pady=(20, 5)
+)
+
+
+meals_subheading = ctk.CTkLabel(
     meals_frame,
-    text="Meal",
-    font=("Arial", 14, "bold")
+    text="Track what you've had today",
+    font=("Arial", 13),
+    text_color=MUTED_TEXT
 )
 
-status_heading = ctk.CTkLabel(
+meals_subheading.pack(
+    anchor="w",
+    padx=20,
+    pady=(0, 15)
+)
+
+
+# Container for individual meal cards
+meal_cards_frame = ctk.CTkFrame(
     meals_frame,
-    text="Status",
-    font=("Arial", 14, "bold")
+    fg_color="transparent"
 )
 
-meal_heading.grid(row=1, column=0, padx=20, pady=5, sticky="w")
-status_heading.grid(row=1, column=1, padx=20, pady=5)
+meal_cards_frame.pack(
+    fill="x",
+    padx=15,
+    pady=(0, 15)
+)
 
-row = 2
 
+row = 0
 outside_dinner_entry = None
+
+meal_icons = {
+    "Breakfast": "🍳",
+    "Lunch": "🍛",
+    "Dinner": "🌙"
+}
+
 
 for meal, price in meals.items():
 
+    # Individual meal card
+    meal_card = ctk.CTkFrame(
+        meal_cards_frame,
+        fg_color=CARD_HOVER,
+        corner_radius=14,
+        border_width=1,
+        border_color=BORDER_COLOR
+    )
+
+    meal_card.pack(
+        fill="x",
+        padx=5,
+        pady=6
+    )
+
+
+    # Meal icon + name
     meal_label = ctk.CTkLabel(
-        meals_frame,
-        text=meal
+        meal_card,
+        text=f"{meal_icons[meal]}  {meal}",
+        font=("Arial", 15, "bold"),
+        text_color=TEXT_COLOR
     )
 
+    meal_label.pack(
+        side="left",
+        padx=15,
+        pady=14
+    )
+
+
+    # Meal price
+    if meal == "Dinner" and date.today().weekday() == 6:
+
+        price_text = "Outside"
+
+    else:
+
+        price_text = f"₹{price}"
+
+
+    price_label = ctk.CTkLabel(
+        meal_card,
+        text=price_text,
+        font=("Arial", 14),
+        text_color=MUTED_TEXT
+    )
+
+    price_label.pack(
+        side="right",
+        padx=(10, 15),
+        pady=14
+    )
+
+
+    # Checkbox
     meal_checkbox = ctk.CTkCheckBox(
-        meals_frame,
+        meal_card,
         text="",
-        command=update_bill
+        command=update_bill,
+        fg_color=PRIMARY_COLOR,
+        hover_color=PRIMARY_HOVER,
+        border_color=MUTED_TEXT,
+        border_width=2,
+        corner_radius=6,
+        checkmark_color=TEXT_COLOR
     )
 
-    meal_label.grid(row=row, column=0, padx=20, pady=8, sticky="w")
-    meal_checkbox.grid(row=row, column=1, padx=20, pady=8)
+    meal_checkbox.pack(
+        side="right",
+        padx=5,
+        pady=14
+    )
+
 
     checkboxes[meal] = meal_checkbox
+
 
     # Sunday outside dinner amount
     if meal == "Dinner":
 
         outside_dinner_entry = ctk.CTkEntry(
-            meals_frame,
-            placeholder_text="Sunday outside dinner ₹",
-            width=180
+            meal_card,
+            placeholder_text="₹ amount",
+            width=110,
+            height=32
         )
 
-    if date.today().weekday() == 6:
+        if date.today().weekday() == 6:
 
-        outside_dinner_entry.grid(
-            row=row,
-            column=2,
-            padx=20,
-            pady=8
-        )
+            outside_dinner_entry.pack(
+                side="right",
+                padx=10,
+                pady=10
+            )
 
-        outside_dinner_entry.bind(
-            "<KeyRelease>",
-            lambda event: update_bill()
-        )
+            outside_dinner_entry.bind(
+                "<KeyRelease>",
+                lambda event: update_bill()
+            )
+
 
     row += 1
-
-# ---------------- BILL FRAME ----------------
 # ---------------- BILL FRAME ----------------
 
-bill_frame = ctk.CTkFrame(app)
-
+bill_frame = ctk.CTkFrame(
+    app,
+    fg_color=CARD_COLOR,
+    corner_radius=18,
+    border_width=1,
+    border_color=BORDER_COLOR
+)
 # Today's Bill Heading
 
 bill_heading = ctk.CTkLabel(
@@ -613,12 +1030,21 @@ bill_frame.pack(fill="x", padx=20, pady=10)
 
 # ---------------- BUTTON FRAME ----------------
 
-button_frame = ctk.CTkFrame(app)
+button_frame = ctk.CTkFrame(
+    app,
+    fg_color=CARD_COLOR,
+    corner_radius=18,
+    border_width=1,
+    border_color=BORDER_COLOR
+)
 
 save_button = ctk.CTkButton(
     button_frame,
     text="Save Today's Record",
-    command=save_record
+    command=save_record,
+    fg_color=PRIMARY_COLOR,
+    hover_color=PRIMARY_HOVER,
+    corner_radius=10
 )
 
 save_button.pack(pady=10)
@@ -626,7 +1052,10 @@ save_button.pack(pady=10)
 history_button = ctk.CTkButton(
     button_frame,
     text="Meal History",
-    command=show_history
+    command=show_history,
+    fg_color=PRIMARY_COLOR,
+    hover_color=PRIMARY_HOVER,
+    corner_radius=10
 )
 
 history_button.pack(pady=10)
@@ -635,7 +1064,10 @@ history_button.pack(pady=10)
 summary_button = ctk.CTkButton(
     button_frame,
     text="Monthly Summary",
-    command=show_monthly_summary
+    command=show_monthly_summary,
+    fg_color=PRIMARY_COLOR,
+    hover_color=PRIMARY_HOVER,
+    corner_radius=10
 )
 
 summary_button.pack(pady=10)
