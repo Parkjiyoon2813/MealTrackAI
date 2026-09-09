@@ -398,3 +398,112 @@ def fetch_meal_type_distribution(cursor, current_date=None, meal_prices=None):
         "days_count": len(records),
     }
 
+
+DEFAULT_NOTIFICATION_SETTINGS = {
+    "notifications_enabled": "1",
+    "breakfast_time": "10:00",
+    "lunch_time": "14:30",
+    "dinner_time": "22:00",
+    "inactivity_check": "1",
+    "inactivity_time": "21:30",
+}
+
+
+def send_system_notification(title, message):
+    import subprocess
+    import threading
+
+    def _send():
+        safe_title = title.replace("'", "''").replace('"', '`"')
+        safe_message = message.replace("'", "''").replace('"', '`"')
+        ps_cmd = f"""
+        [void] [System.Reflection.Assembly]::LoadWithPartialName("System.Windows.Forms")
+        $objNotifyIcon = New-Object System.Windows.Forms.NotifyIcon
+        $objNotifyIcon.Icon = [System.Drawing.SystemIcons]::Information
+        $objNotifyIcon.BalloonTipIcon = "Info"
+        $objNotifyIcon.BalloonTipTitle = "{safe_title}"
+        $objNotifyIcon.BalloonTipText = "{safe_message}"
+        $objNotifyIcon.Visible = $True
+        $objNotifyIcon.ShowBalloonTip(5000)
+        Start-Sleep -Seconds 6
+        $objNotifyIcon.Dispose()
+        """
+        try:
+            subprocess.run(
+                ["powershell", "-NoProfile", "-WindowStyle", "Hidden", "-Command", ps_cmd],
+                capture_output=True,
+                timeout=10,
+            )
+        except Exception:
+            pass
+
+    thread = threading.Thread(target=_send, daemon=True)
+    thread.start()
+
+
+def check_pending_reminders(cursor, current_time=None, sent_keys_today=None, settings=None):
+    from database import get_setting
+
+    if sent_keys_today is None:
+        sent_keys_today = set()
+
+    # Load notification settings
+    if settings is None:
+        settings = {}
+        for k, def_val in DEFAULT_NOTIFICATION_SETTINGS.items():
+            settings[k] = get_setting(cursor, k, def_val)
+
+    if str(settings.get("notifications_enabled", "1")) != "1":
+        return []
+
+    now = current_time or datetime.now()
+    now_hm = now.strftime("%H:%M")
+
+    # Fetch today's record
+    record = fetch_today_record(cursor, current_date=now.date())
+    bf = record[0] if record else 0
+    lu = record[1] if record else 0
+    dn = record[2] if record else 0
+
+    pending = []
+
+    # 1. Breakfast Check
+    bf_time = settings.get("breakfast_time", "10:00")
+    if now_hm >= bf_time and bf == 0 and "breakfast" not in sent_keys_today:
+        pending.append((
+            "breakfast",
+            "🍳 Breakfast Reminder",
+            "Don't forget to mark your Breakfast in MealTrack AI!",
+        ))
+
+    # 2. Lunch Check
+    lu_time = settings.get("lunch_time", "14:30")
+    if now_hm >= lu_time and lu == 0 and "lunch" not in sent_keys_today:
+        pending.append((
+            "lunch",
+            "🍛 Lunch Reminder",
+            "Don't forget to mark your Lunch in MealTrack AI!",
+        ))
+
+    # 3. Dinner Check
+    dn_time = settings.get("dinner_time", "22:00")
+    if now_hm >= dn_time and dn == 0 and "dinner" not in sent_keys_today:
+        pending.append((
+            "dinner",
+            "🌙 Dinner Reminder",
+            "Don't forget to mark your Dinner in MealTrack AI!",
+        ))
+
+    # 4. Daily Inactivity Check (No meals recorded at all)
+    inact_enabled = str(settings.get("inactivity_check", "1")) == "1"
+    inact_time = settings.get("inactivity_time", "21:30")
+    if inact_enabled and now_hm >= inact_time and (bf == 0 and lu == 0 and dn == 0) and "inactivity" not in sent_keys_today:
+        pending.append((
+            "inactivity",
+            "⚠️ Missing Meals Alert",
+            "No meals have been recorded for today yet. Take a moment to log them in MealTrack AI!",
+        ))
+
+    return pending
+
+

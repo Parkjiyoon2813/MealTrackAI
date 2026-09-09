@@ -20,10 +20,12 @@ from constants import (
     WARNING_COLOR,
     WINDOW_SIZE,
 )
-from database import init_database
+from database import get_setting, init_database, set_setting
 from logic import (
     DATE_FORMAT,
+    DEFAULT_NOTIFICATION_SETTINGS,
     calculate_bill,
+    check_pending_reminders,
     fetch_dashboard_totals,
     fetch_history_records,
     fetch_meal_type_distribution,
@@ -46,7 +48,9 @@ from logic import (
     parse_outside_dinner_amount,
     save_date_meal_record,
     save_meal_record,
+    send_system_notification,
 )
+
 
 
 class MealTrackApp:
@@ -54,11 +58,24 @@ class MealTrackApp:
         ctk.set_appearance_mode("dark")
 
         self.connection, self.cursor = init_database()
-        self.user_name = USER_NAME
-        self.meal_prices = dict(MEALS)
+        self.user_name = get_setting(self.cursor, "user_name", USER_NAME)
+        self.meal_prices = {
+            "Breakfast": int(get_setting(self.cursor, "price_breakfast", MEALS["Breakfast"])),
+            "Lunch": int(get_setting(self.cursor, "price_lunch", MEALS["Lunch"])),
+            "Dinner": int(get_setting(self.cursor, "price_dinner", MEALS["Dinner"])),
+        }
         self.bill = 0
         self.today_meal_states = {"Breakfast": 0, "Lunch": 0, "Dinner": 0}
         self.today_outside_dinner = 0
+
+        # Notification Preferences & State
+        self.notification_settings = {}
+        for k, def_val in DEFAULT_NOTIFICATION_SETTINGS.items():
+            self.notification_settings[k] = get_setting(self.cursor, k, def_val)
+
+        self.sent_reminders_today = set()
+        self.last_reminder_check_day = date.today().day
+        self.toast_banner = None
 
         # Active navigation view
         self.current_view = "dashboard"
@@ -89,6 +106,89 @@ class MealTrackApp:
         self.load_today_record()
         self.show_view("dashboard")
 
+        # Start periodic notification checker (first check after 5 seconds)
+        self.app.after(5000, self.run_notification_checker)
+
+    def show_toast_banner(self, title, message):
+        if self.toast_banner and self.toast_banner.winfo_exists():
+            try:
+                self.toast_banner.destroy()
+            except Exception:
+                pass
+
+        self.toast_banner = ctk.CTkFrame(
+            self.app,
+            fg_color="#1F143A",
+            corner_radius=16,
+            border_width=2,
+            border_color=PRIMARY_COLOR,
+            width=360,
+            height=90,
+        )
+        self.toast_banner.place(relx=0.98, rely=0.03, anchor="ne")
+        self.toast_banner.pack_propagate(False)
+
+        content = ctk.CTkFrame(self.toast_banner, fg_color="transparent")
+        content.pack(fill="both", expand=True, padx=14, pady=10)
+
+        top_row = ctk.CTkFrame(content, fg_color="transparent")
+        top_row.pack(fill="x")
+
+        t_lbl = ctk.CTkLabel(top_row, text=title, font=("Arial", 12, "bold"), text_color=TEXT_COLOR)
+        t_lbl.pack(side="left")
+
+        close_btn = ctk.CTkButton(
+            top_row,
+            text="✕",
+            width=22,
+            height=22,
+            fg_color="transparent",
+            hover_color="#3B1C66",
+            font=("Arial", 11, "bold"),
+            text_color=MUTED_TEXT,
+            command=self.toast_banner.destroy,
+        )
+        close_btn.pack(side="right")
+
+        m_lbl = ctk.CTkLabel(
+            content,
+            text=message,
+            font=("Arial", 11),
+            text_color=MUTED_TEXT,
+            justify="left",
+            wraplength=310,
+        )
+        m_lbl.pack(anchor="w", pady=(3, 0))
+
+        # Auto dismiss after 7 seconds
+        self.app.after(
+            7000,
+            lambda: self.toast_banner.destroy() if self.toast_banner and self.toast_banner.winfo_exists() else None,
+        )
+
+    def run_notification_checker(self):
+        try:
+            today_d = date.today().day
+            if today_d != self.last_reminder_check_day:
+                self.sent_reminders_today.clear()
+                self.last_reminder_check_day = today_d
+
+            pending = check_pending_reminders(
+                self.cursor,
+                sent_keys_today=self.sent_reminders_today,
+                settings=self.notification_settings,
+            )
+
+            for alert_key, title, msg in pending:
+                self.sent_reminders_today.add(alert_key)
+                send_system_notification(title, msg)
+                self.show_toast_banner(title, msg)
+        except Exception as e:
+            print("Notification checker error:", e)
+
+        # Check again every 30 seconds
+        self.app.after(30000, self.run_notification_checker)
+
     def close(self):
         try:
             self.connection.close()
@@ -98,6 +198,7 @@ class MealTrackApp:
 
     def run(self):
         self.app.mainloop()
+
 
     # -------------------------------------------------------------
     # STATE & DATA SYNCHRONIZATION
@@ -1366,27 +1467,153 @@ class MealTrackApp:
         lu_entry_ref[0] = create_rate_row("Lunch (₹):", self.meal_prices.get("Lunch", 50))
         dn_entry_ref[0] = create_rate_row("Dinner (₹):", self.meal_prices.get("Dinner", 30))
 
-        # Save Button
+        divider2 = ctk.CTkFrame(card, height=1, fg_color=BORDER_COLOR)
+        divider2.pack(fill="x", padx=20, pady=16)
+
+        # Smart Meal Reminders & Notifications
+        notif_hdr_row = ctk.CTkFrame(card, fg_color="transparent")
+        notif_hdr_row.pack(fill="x", padx=20, pady=(0, 6))
+
+        ctk.CTkLabel(
+            notif_hdr_row,
+            text="🔔 Smart Meal Reminders & Notifications",
+            font=("Arial", 16, "bold"),
+            text_color=TEXT_COLOR,
+        ).pack(side="left")
+
+        # Master Toggle Switch
+        is_notif_on = str(self.notification_settings.get("notifications_enabled", "1")) == "1"
+        notif_enabled_var = ctk.BooleanVar(value=is_notif_on)
+
+        notif_switch = ctk.CTkSwitch(
+            notif_hdr_row,
+            text="Enable Reminders",
+            variable=notif_enabled_var,
+            font=("Arial", 12, "bold"),
+            progress_color=PRIMARY_COLOR,
+            text_color=TEXT_COLOR,
+        )
+        notif_switch.pack(side="right")
+
+        notif_sub_lbl = ctk.CTkLabel(
+            card,
+            text="Receive timely desktop alerts after standard meal hours and an evening alert if no meals were logged.",
+            font=("Arial", 11),
+            text_color=MUTED_TEXT,
+            justify="left",
+        )
+        notif_sub_lbl.pack(anchor="w", padx=20, pady=(0, 10))
+
+        # Reminder Time Inputs
+        times_card = ctk.CTkFrame(card, fg_color=CARD_HOVER, corner_radius=14)
+        times_card.pack(fill="x", padx=20, pady=(0, 14))
+
+        def create_time_row(parent, label_text, default_time):
+            r = ctk.CTkFrame(parent, fg_color="transparent")
+            r.pack(fill="x", padx=14, pady=4)
+            ctk.CTkLabel(r, text=label_text, font=("Arial", 12), text_color=TEXT_COLOR, width=220, anchor="w").pack(side="left")
+            e = ctk.CTkEntry(r, width=80, placeholder_text="HH:MM")
+            e.pack(side="left")
+            e.insert(0, str(default_time))
+            ctk.CTkLabel(r, text="(24-hr format, e.g. 14:30)", font=("Arial", 10), text_color=MUTED_TEXT).pack(side="left", padx=8)
+            return e
+
+        bf_time_entry = create_time_row(
+            times_card,
+            "🍳 Breakfast Reminder Time:",
+            self.notification_settings.get("breakfast_time", "10:00"),
+        )
+        lu_time_entry = create_time_row(
+            times_card,
+            "🍛 Lunch Reminder Time:",
+            self.notification_settings.get("lunch_time", "14:30"),
+        )
+        dn_time_entry = create_time_row(
+            times_card,
+            "🌙 Dinner Reminder Time:",
+            self.notification_settings.get("dinner_time", "22:00"),
+        )
+
+        inact_divider = ctk.CTkFrame(times_card, height=1, fg_color=BORDER_COLOR)
+        inact_divider.pack(fill="x", padx=12, pady=6)
+
+        # Inactivity Check Controls
+        is_inact_on = str(self.notification_settings.get("inactivity_check", "1")) == "1"
+        inact_enabled_var = ctk.BooleanVar(value=is_inact_on)
+
+        inact_switch = ctk.CTkSwitch(
+            times_card,
+            text="Alert if NO meals have been marked by evening",
+            variable=inact_enabled_var,
+            font=("Arial", 12, "bold"),
+            progress_color=WARNING_COLOR,
+            text_color=TEXT_COLOR,
+        )
+        inact_switch.pack(anchor="w", padx=14, pady=(4, 4))
+
+        inact_time_entry = create_time_row(
+            times_card,
+            "⚠️ Evening Inactivity Check Time:",
+            self.notification_settings.get("inactivity_time", "21:30"),
+        )
+
+        # Action Row (Test Notification + Save Preferences)
         action_row = ctk.CTkFrame(card, fg_color="transparent")
-        action_row.pack(fill="x", padx=20, pady=(18, 20))
+        action_row.pack(fill="x", padx=20, pady=(10, 20))
+
+        def test_notification():
+            test_title = "🔔 MealTrack AI — Reminder Test"
+            test_msg = "Notifications are active and working! You will be alerted when meal markings are pending."
+            send_system_notification(test_title, test_msg)
+            self.show_toast_banner(test_title, test_msg)
+
+        test_btn = ctk.CTkButton(
+            action_row,
+            text="🔔 Test Notification",
+            command=test_notification,
+            fg_color=CARD_HOVER,
+            hover_color="#302254",
+            font=("Arial", 13, "bold"),
+            height=36,
+            corner_radius=10,
+            text_color=TEXT_COLOR,
+        )
+        test_btn.pack(side="left", padx=(0, 10))
 
         def save_settings():
             new_name = name_entry.get().strip()
             if new_name:
                 self.user_name = new_name
+                set_setting(self.cursor, self.connection, "user_name", self.user_name)
+
             try:
                 self.meal_prices["Breakfast"] = int(bf_entry_ref[0].get())
                 self.meal_prices["Lunch"] = int(lu_entry_ref[0].get())
                 self.meal_prices["Dinner"] = int(dn_entry_ref[0].get())
+                set_setting(self.cursor, self.connection, "price_breakfast", self.meal_prices["Breakfast"])
+                set_setting(self.cursor, self.connection, "price_lunch", self.meal_prices["Lunch"])
+                set_setting(self.cursor, self.connection, "price_dinner", self.meal_prices["Dinner"])
             except ValueError:
                 pass
 
+            # Save Notification Settings
+            self.notification_settings["notifications_enabled"] = "1" if notif_enabled_var.get() else "0"
+            self.notification_settings["breakfast_time"] = bf_time_entry.get().strip() or "10:00"
+            self.notification_settings["lunch_time"] = lu_time_entry.get().strip() or "14:30"
+            self.notification_settings["dinner_time"] = dn_time_entry.get().strip() or "22:00"
+            self.notification_settings["inactivity_check"] = "1" if inact_enabled_var.get() else "0"
+            self.notification_settings["inactivity_time"] = inact_time_entry.get().strip() or "21:30"
+
+            for k, v in self.notification_settings.items():
+                set_setting(self.cursor, self.connection, k, v)
+
             self.refresh_all_dashboard_views()
-            print("Settings saved successfully!")
+            self.show_toast_banner("✓ Settings Saved", "Your notification preferences have been saved successfully!")
+            print("Settings and Notification preferences saved successfully!")
 
         save_btn = ctk.CTkButton(
             action_row,
-            text="Save Preferences",
+            text="💾 Save Preferences",
             command=save_settings,
             fg_color=PRIMARY_COLOR,
             hover_color=PRIMARY_HOVER,
@@ -1395,6 +1622,7 @@ class MealTrackApp:
             corner_radius=10,
         )
         save_btn.pack(side="left")
+
 
     # -------------------------------------------------------------
     # VIEW 7: ABOUT
