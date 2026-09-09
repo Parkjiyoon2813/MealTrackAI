@@ -55,11 +55,19 @@ class MealTrackApp:
         ctk.set_appearance_mode("dark")
 
         self.connection, self.cursor = init_database()
-        self.user_name = get_setting(self.cursor, "user_name", USER_NAME)
+        self.user_name = str(get_setting(self.cursor, "user_name", USER_NAME) or USER_NAME)
+
+        def get_price(key: str, default_val: int) -> int:
+            val = get_setting(self.cursor, key, default_val)
+            try:
+                return int(val) if val is not None else default_val
+            except (ValueError, TypeError):
+                return default_val
+
         self.meal_prices = {
-            "Breakfast": int(get_setting(self.cursor, "price_breakfast", MEALS["Breakfast"])),
-            "Lunch": int(get_setting(self.cursor, "price_lunch", MEALS["Lunch"])),
-            "Dinner": int(get_setting(self.cursor, "price_dinner", MEALS["Dinner"])),
+            "Breakfast": get_price("price_breakfast", MEALS["Breakfast"]),
+            "Lunch": get_price("price_lunch", MEALS["Lunch"]),
+            "Dinner": get_price("price_dinner", MEALS["Dinner"]),
         }
         self.bill = 0
         self.today_meal_states = {"Breakfast": 0, "Lunch": 0, "Dinner": 0}

@@ -34,7 +34,7 @@ def init_database(db_path="meals.db"):
 def get_setting(cursor, key, default=None):
     cursor.execute("SELECT value FROM settings WHERE key=?", (key,))
     row = cursor.fetchone()
-    if row is not None:
+    if row is not None and row[0] is not None:
         return row[0]
     return default
 
