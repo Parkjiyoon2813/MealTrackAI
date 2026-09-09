@@ -1,9 +1,5 @@
 {
   "version": 2,
-  "rewrites": [
-    {
-      "source": "/(.*)",
-      "destination": "/web/$1"
-    }
-  ]
+  "buildCommand": "echo 'Static site'",
+  "outputDirectory": "web"
 }
