@@ -1,5 +1,5 @@
 {
   "version": 2,
-  "buildCommand": "xcopy web . /E /I /Y",
+  "buildCommand": "cp -r web/* .",
   "outputDirectory": "."
 }
