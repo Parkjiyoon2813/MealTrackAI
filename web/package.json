@@ -1,0 +1,12 @@
+{
+  "name": "mealtrackai-web",
+  "version": "1.0.0",
+  "description": "MealTrack AI - Smart Mess Tracker Web App",
+  "private": true,
+  "scripts": {
+    "build": "echo 'Static site - no build needed'"
+  },
+  "keywords": ["meal", "tracker", "mess", "budget"],
+  "author": "Jiyoon",
+  "license": "MIT"
+}
