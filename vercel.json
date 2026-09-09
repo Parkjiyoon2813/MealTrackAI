@@ -1,5 +1,6 @@
 {
   "version": 2,
-  "buildCommand": "cp -r web/* .",
-  "outputDirectory": "."
+  "public": false,
+  "buildCommand": "",
+  "outputDirectory": "web"
 }
