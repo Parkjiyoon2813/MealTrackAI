@@ -31,10 +31,7 @@ from logic import (
     fetch_meal_type_distribution,
     fetch_monthly_summary,
     fetch_record_by_date,
-    fetch_statistics,
     fetch_today_record,
-    get_calendar_month,
-    get_calendar_weeks,
     get_completed_meals,
     get_display_date,
     get_greeting,
@@ -464,7 +461,7 @@ class MealTrackApp:
         kpi_row = ctk.CTkFrame(self.active_view_frame, fg_color="transparent")
         kpi_row.pack(fill="x", padx=2, pady=(0, 14))
 
-        completed_today = sum(self.today_meal_states.values())
+        completed_today = get_completed_meals(self.today_meal_states)
         total_month_spent, avg_daily = fetch_dashboard_totals(self.cursor)
 
         self.create_dashboard_kpi_card(
@@ -1083,7 +1080,7 @@ class MealTrackApp:
         cards_row.pack(fill="x", padx=2, pady=(0, 14))
 
         is_sun_today = is_sunday()
-        outside_entry_ref = [None]
+        outside_entry: ctk.CTkEntry | None = None
 
         for meal_name, price in self.meal_prices.items():
             card = ctk.CTkFrame(cards_row, fg_color=CARD_COLOR, corner_radius=18, border_width=1, border_color=BORDER_COLOR)
@@ -1109,12 +1106,12 @@ class MealTrackApp:
                 oe_entry.pack(side="left")
                 if self.today_outside_dinner > 0:
                     oe_entry.insert(0, str(self.today_outside_dinner))
-                outside_entry_ref[0] = oe_entry
+                outside_entry = oe_entry
 
             t_btn = ctk.CTkButton(
                 card,
                 text="✓ Completed" if is_checked else "Mark as Completed",
-                command=lambda mn=meal_name: self.toggle_today_meal_advanced(mn, outside_entry_ref[0]),
+                command=lambda mn=meal_name: self.toggle_today_meal_advanced(mn, outside_entry),
                 fg_color=SUCCESS_COLOR if is_checked else PRIMARY_COLOR,
                 hover_color="#16A34A" if is_checked else PRIMARY_HOVER,
                 font=("Arial", 12, "bold"),
@@ -1136,7 +1133,7 @@ class MealTrackApp:
         save_btn = ctk.CTkButton(
             s_row,
             text="💾 Save Record to Database",
-            command=lambda: self.save_today_meals_explicit(outside_entry_ref[0]),
+            command=lambda: self.save_today_meals_explicit(outside_entry),
             fg_color=PRIMARY_COLOR,
             hover_color=PRIMARY_HOVER,
             font=("Arial", 13, "bold"),
@@ -1450,10 +1447,6 @@ class MealTrackApp:
         # Meal Pricing Configuration
         ctk.CTkLabel(card, text="Standard Meal Pricing Rates (₹)", font=("Arial", 16, "bold"), text_color=TEXT_COLOR).pack(anchor="w", padx=20, pady=(0, 10))
 
-        bf_entry_ref = [None]
-        lu_entry_ref = [None]
-        dn_entry_ref = [None]
-
         def create_rate_row(label, current_val):
             r = ctk.CTkFrame(card, fg_color="transparent")
             r.pack(fill="x", padx=20, pady=4)
@@ -1463,9 +1456,9 @@ class MealTrackApp:
             e.insert(0, str(current_val))
             return e
 
-        bf_entry_ref[0] = create_rate_row("Breakfast (₹):", self.meal_prices.get("Breakfast", 30))
-        lu_entry_ref[0] = create_rate_row("Lunch (₹):", self.meal_prices.get("Lunch", 50))
-        dn_entry_ref[0] = create_rate_row("Dinner (₹):", self.meal_prices.get("Dinner", 30))
+        bf_entry = create_rate_row("Breakfast (₹):", self.meal_prices.get("Breakfast", 30))
+        lu_entry = create_rate_row("Lunch (₹):", self.meal_prices.get("Lunch", 50))
+        dn_entry = create_rate_row("Dinner (₹):", self.meal_prices.get("Dinner", 30))
 
         divider2 = ctk.CTkFrame(card, height=1, fg_color=BORDER_COLOR)
         divider2.pack(fill="x", padx=20, pady=16)
@@ -1587,9 +1580,9 @@ class MealTrackApp:
                 set_setting(self.cursor, self.connection, "user_name", self.user_name)
 
             try:
-                self.meal_prices["Breakfast"] = int(bf_entry_ref[0].get())
-                self.meal_prices["Lunch"] = int(lu_entry_ref[0].get())
-                self.meal_prices["Dinner"] = int(dn_entry_ref[0].get())
+                self.meal_prices["Breakfast"] = int(bf_entry.get())
+                self.meal_prices["Lunch"] = int(lu_entry.get())
+                self.meal_prices["Dinner"] = int(dn_entry.get())
                 set_setting(self.cursor, self.connection, "price_breakfast", self.meal_prices["Breakfast"])
                 set_setting(self.cursor, self.connection, "price_lunch", self.meal_prices["Lunch"])
                 set_setting(self.cursor, self.connection, "price_dinner", self.meal_prices["Dinner"])
