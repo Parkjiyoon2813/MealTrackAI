@@ -1,5 +1,5 @@
 {
   "version": 2,
-  "buildCommand": "echo 'Static site'",
-  "outputDirectory": "web"
+  "buildCommand": "xcopy web . /E /I /Y",
+  "outputDirectory": "."
 }
