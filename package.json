@@ -4,9 +4,6 @@
   "description": "MealTrack AI - Smart Mess & Daily Meal Tracker",
   "private": true,
   "scripts": {
-    "build": "echo 'Deploying from web folder'"
-  },
-  "keywords": ["meal", "tracker", "mess", "budget", "ai"],
-  "author": "Jiyoon",
-  "license": "MIT"
+    "build": "true"
+  }
 }

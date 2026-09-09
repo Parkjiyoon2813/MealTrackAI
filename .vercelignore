@@ -1,0 +1,17 @@
+*.py
+.venv/
+__pycache__/
+*.pyc
+*.db
+.git/
+.vscode/
+AGENTS.md
+app.py
+constants.py
+database.py
+logic.py
+ui.py
+pyrightconfig.json
+launch.vbs
+MealTrackAI.bat
+references/
