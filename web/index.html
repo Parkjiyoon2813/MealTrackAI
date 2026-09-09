@@ -1,0 +1,563 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>MealTrack AI — Smart Mess & Daily Meal Tracker</title>
+  <meta name="description" content="AI-assisted daily mess and meal tracking dashboard with automatic bill calculation, monthly summaries, past-date editing, and smart reminders.">
+  <meta name="theme-color" content="#0B0818">
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+  <!-- Stylesheet -->
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="manifest" href="manifest.json">
+</head>
+<body>
+  <div class="app-container">
+
+    <!-- Left Sidebar Navigation -->
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-icon">🍽️</div>
+        <div>
+          <div class="brand-title">MealTrack AI</div>
+          <div class="brand-subtitle">Smart Mess Tracker</div>
+        </div>
+      </div>
+
+      <nav class="nav-menu" aria-label="Main Navigation">
+        <button class="nav-item active" data-view="dashboard" id="nav-btn-dashboard">
+          <span class="nav-icon">📊</span>
+          <span>Dashboard</span>
+        </button>
+        <button class="nav-item" data-view="today-meals" id="nav-btn-today-meals">
+          <span class="nav-icon">🍴</span>
+          <span>Today's Meals</span>
+        </button>
+        <button class="nav-item" data-view="history" id="nav-btn-history">
+          <span class="nav-icon">📅</span>
+          <span>Meal History</span>
+        </button>
+        <button class="nav-item" data-view="monthly" id="nav-btn-monthly">
+          <span class="nav-icon">🗓️</span>
+          <span>Monthly Summary</span>
+        </button>
+        <button class="nav-item" data-view="analytics" id="nav-btn-analytics">
+          <span class="nav-icon">📈</span>
+          <span>Analytics</span>
+        </button>
+        <button class="nav-item" data-view="settings" id="nav-btn-settings">
+          <span class="nav-icon">⚙️</span>
+          <span>Settings</span>
+        </button>
+      </nav>
+
+      <div class="sidebar-footer">
+        <div class="sidebar-summary-card">
+          <div class="sidebar-summary-title">Month Spend</div>
+          <div class="sidebar-summary-value" id="sidebar-month-spend">₹0</div>
+          <div class="sidebar-summary-sub" id="sidebar-month-days">0 / 30 days logged</div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Main Application Wrapper -->
+    <div class="main-wrapper">
+
+      <!-- Top Header Bar -->
+      <header class="top-header">
+        <div class="header-left">
+          <button class="mobile-menu-btn" id="mobile-menu-toggle" aria-label="Toggle Navigation Menu">☰</button>
+          <h1 class="greeting-text" id="dynamic-greeting">Good Morning, Sowmya 👋</h1>
+        </div>
+
+        <div class="header-right">
+          <div class="date-pill" id="header-date-pill">📅 Loading Date...</div>
+          <button class="header-btn header-btn-primary" id="quick-log-past-btn">
+            <span>+</span>
+            <span>Log Past Date</span>
+          </button>
+        </div>
+      </header>
+
+      <!-- Scrollable Main Content -->
+      <main class="content-area">
+
+        <!-- ============================================================= -->
+        <!-- VIEW 1: DASHBOARD -->
+        <!-- ============================================================= -->
+        <section class="view-section active-view" id="view-dashboard">
+          
+          <!-- Top 4 KPI Cards -->
+          <div class="kpi-grid">
+            <div class="kpi-card">
+              <div class="kpi-icon-badge" style="background-color: #26174D; color: #A855F7;">🍽️</div>
+              <div class="kpi-info">
+                <span class="kpi-label">Today's Bill</span>
+                <span class="kpi-value" id="kpi-today-bill" style="color: #A855F7;">₹0</span>
+              </div>
+            </div>
+
+            <div class="kpi-card">
+              <div class="kpi-icon-badge" style="background-color: #0B3728; color: #10B981;">🍴</div>
+              <div class="kpi-info">
+                <span class="kpi-label">Meals Completed</span>
+                <span class="kpi-value" id="kpi-meals-completed" style="color: #10B981;">0 / 3</span>
+              </div>
+            </div>
+
+            <div class="kpi-card">
+              <div class="kpi-icon-badge" style="background-color: #3F270B; color: #F59E0B;">🔥</div>
+              <div class="kpi-info">
+                <span class="kpi-label">This Month</span>
+                <span class="kpi-value" id="kpi-month-spend" style="color: #F59E0B;">₹0</span>
+              </div>
+            </div>
+
+            <div class="kpi-card">
+              <div class="kpi-icon-badge" style="background-color: #401228; color: #EC4899;">💖</div>
+              <div class="kpi-info">
+                <span class="kpi-label">Avg / Day</span>
+                <span class="kpi-value" id="kpi-avg-daily" style="color: #EC4899;">₹0</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Middle Section: 3-Column Grid -->
+          <div class="dashboard-mid-grid">
+            
+            <!-- Column 1: Today's Meals Card -->
+            <div class="dash-card">
+              <div class="dash-card-header">
+                <div class="dash-card-title">🍴 Today's Meals</div>
+                <div class="badge-pill">Goal: 3 meals / day</div>
+              </div>
+              <div class="today-meals-row" id="dash-today-meals-grid">
+                <!-- Dynamically injected -->
+              </div>
+            </div>
+
+            <!-- Column 2: Mini Month Calendar -->
+            <div class="dash-card">
+              <div class="cal-header-row">
+                <button class="cal-nav-btn" id="dash-cal-prev">&lt;</button>
+                <div class="cal-month-title" id="dash-calendar-month-title">Month Year</div>
+                <button class="cal-nav-btn" id="dash-cal-next">&gt;</button>
+              </div>
+              <div class="calendar-grid" id="dash-calendar-grid">
+                <!-- Dynamically injected -->
+              </div>
+            </div>
+
+            <!-- Column 3: Monthly Summary Quick Card -->
+            <div class="dash-card">
+              <div class="dash-card-header">
+                <div class="dash-card-title">📊 Monthly Summary</div>
+              </div>
+              <div class="summary-stat-list" id="dash-month-summary-list">
+                <!-- Dynamically injected -->
+              </div>
+            </div>
+
+          </div>
+
+          <!-- Bottom Section: 3-Column Grid -->
+          <div class="dashboard-bottom-grid">
+            
+            <!-- Column 1: Spending Trend Bar Chart -->
+            <div class="dash-card">
+              <div class="dash-card-header">
+                <div class="dash-card-title">📈 Spending Trend (Last 7 Days)</div>
+              </div>
+              <div class="trend-chart-container" id="dash-trend-bars">
+                <!-- Dynamically injected -->
+              </div>
+            </div>
+
+            <!-- Column 2: Quick Insights -->
+            <div class="dash-card">
+              <div class="dash-card-header">
+                <div class="dash-card-title">💡 Quick Insights</div>
+              </div>
+              <div class="insights-list" id="dash-insights-list">
+                <!-- Dynamically injected -->
+              </div>
+            </div>
+
+            <!-- Column 3: Motivation Card -->
+            <div class="dash-card">
+              <div class="dash-card-header">
+                <div class="dash-card-title">✨ Motivation</div>
+              </div>
+              <div class="motivation-card-content">
+                <div class="motivation-quote" id="dash-motivation-quote">
+                  "Stay with it. Even one well-tracked day makes the monthly picture clearer."
+                </div>
+              </div>
+            </div>
+
+          </div>
+
+        </section>
+
+        <!-- ============================================================= -->
+        <!-- VIEW 2: TODAY'S MEALS DEDICATED -->
+        <!-- ============================================================= -->
+        <section class="view-section" id="view-today-meals">
+          <div class="view-title-row">
+            <div>
+              <h2 class="view-main-title">🍴 Today's Meal Tracking</h2>
+              <div class="view-main-subtitle">Mark off today's meals and record any outside dinner expenses.</div>
+            </div>
+          </div>
+
+          <div class="meals-full-grid" id="today-meals-full-grid">
+            <!-- Dynamically injected -->
+          </div>
+
+          <div class="today-action-bar">
+            <div class="today-total-display">
+              <span class="today-total-label">Today's Calculated Total:</span>
+              <span class="today-total-amount" id="today-view-total">₹0</span>
+            </div>
+
+            <button class="header-btn header-btn-primary" id="today-view-save-btn" style="padding: 12px 24px; font-size: 14px;">
+              💾 Save Record to Database
+            </button>
+          </div>
+        </section>
+
+        <!-- ============================================================= -->
+        <!-- VIEW 3: MEAL HISTORY & AUDIT LOG -->
+        <!-- ============================================================= -->
+        <section class="view-section" id="view-history">
+          <div class="view-title-row">
+            <div>
+              <h2 class="view-main-title">📅 Meal History & Past-Date Editor</h2>
+              <div class="view-main-subtitle">View all recorded days, edit past meals, or delete mistakes.</div>
+            </div>
+          </div>
+
+          <div class="history-table-container">
+            <div class="table-filter-bar">
+              <input type="text" class="search-input" id="history-search-input" placeholder="🔍 Search by date (e.g. 09-09)...">
+              <button class="header-btn header-btn-primary" onclick="window.mealTrackApp.openDateModal()">+ Log Past Date</button>
+            </div>
+
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Meals Completed</th>
+                  <th>Sunday Outside</th>
+                  <th>Daily Bill</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="history-table-body">
+                <!-- Dynamically injected -->
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- ============================================================= -->
+        <!-- VIEW 4: MONTHLY SUMMARY -->
+        <!-- ============================================================= -->
+        <section class="view-section" id="view-monthly">
+          <div class="view-title-row">
+            <div>
+              <h2 class="view-main-title" id="monthly-view-title">Monthly Summary</h2>
+              <div class="view-main-subtitle">Detailed breakdown and analytics of your monthly mess spending.</div>
+            </div>
+            <div style="display: flex; gap: 8px;">
+              <button class="cal-nav-btn" id="monthly-prev-btn">&lt; Prev Month</button>
+              <button class="cal-nav-btn" id="monthly-next-btn">Next Month &gt;</button>
+            </div>
+          </div>
+
+          <div class="kpi-grid">
+            <div class="kpi-card">
+              <div class="kpi-icon-badge" style="background-color: #3F270B; color: #F59E0B;">💰</div>
+              <div class="kpi-info">
+                <span class="kpi-label">Total Spent</span>
+                <span class="kpi-value" id="monthly-kpi-total-spent" style="color: #F59E0B;">₹0</span>
+              </div>
+            </div>
+
+            <div class="kpi-card">
+              <div class="kpi-icon-badge" style="background-color: #0B3728; color: #10B981;">🥗</div>
+              <div class="kpi-info">
+                <span class="kpi-label">Total Meals</span>
+                <span class="kpi-value" id="monthly-kpi-total-meals" style="color: #10B981;">0 / 90</span>
+              </div>
+            </div>
+
+            <div class="kpi-card">
+              <div class="kpi-icon-badge" style="background-color: #401228; color: #EC4899;">📊</div>
+              <div class="kpi-info">
+                <span class="kpi-label">Daily Average</span>
+                <span class="kpi-value" id="monthly-kpi-avg-spend" style="color: #EC4899;">₹0</span>
+              </div>
+            </div>
+
+            <div class="kpi-card">
+              <div class="kpi-icon-badge" style="background-color: #26174D; color: #A855F7;">🗓️</div>
+              <div class="kpi-info">
+                <span class="kpi-label">Days Logged</span>
+                <span class="kpi-value" id="monthly-kpi-days-logged" style="color: #A855F7;">0 / 30</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Category Breakdown -->
+          <div class="dash-card" style="margin-bottom: 24px;">
+            <div class="dash-card-header">
+              <div class="dash-card-title">🍽️ Meal Distribution Spending</div>
+            </div>
+            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px;">
+              <div style="background-color: var(--card-hover); padding: 16px; border-radius: var(--radius-md); border: 1px solid var(--border-color);">
+                <div style="color: var(--muted-text); font-size: 12px; font-weight: 600;">🍳 Breakfast</div>
+                <div id="monthly-dist-bf-spend" style="font-size: 18px; font-weight: 700; color: #F59E0B; margin-top: 4px;">₹0 (0 meals)</div>
+              </div>
+
+              <div style="background-color: var(--card-hover); padding: 16px; border-radius: var(--radius-md); border: 1px solid var(--border-color);">
+                <div style="color: var(--muted-text); font-size: 12px; font-weight: 600;">🍛 Lunch</div>
+                <div id="monthly-dist-lu-spend" style="font-size: 18px; font-weight: 700; color: #10B981; margin-top: 4px;">₹0 (0 meals)</div>
+              </div>
+
+              <div style="background-color: var(--card-hover); padding: 16px; border-radius: var(--radius-md); border: 1px solid var(--border-color);">
+                <div style="color: var(--muted-text); font-size: 12px; font-weight: 600;">🌙 Dinner</div>
+                <div id="monthly-dist-dn-spend" style="font-size: 18px; font-weight: 700; color: #A855F7; margin-top: 4px;">₹0 (0 meals)</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Monthly Records Table -->
+          <div class="history-table-container">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Meals Completed</th>
+                  <th>Sunday Outside Dinner</th>
+                  <th>Total Bill</th>
+                </tr>
+              </thead>
+              <tbody id="monthly-table-body">
+                <!-- Dynamically injected -->
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- ============================================================= -->
+        <!-- VIEW 5: ANALYTICS -->
+        <!-- ============================================================= -->
+        <section class="view-section" id="view-analytics">
+          <div class="view-title-row">
+            <div>
+              <h2 class="view-main-title">📈 Analytics & Spending Patterns</h2>
+              <div class="view-main-subtitle">Deep dive into your weekly cost distributions and projected spending.</div>
+            </div>
+          </div>
+
+          <div style="display: grid; grid-template-columns: 1.5fr 1fr; gap: 20px;">
+            <div class="dash-card">
+              <div class="dash-card-header">
+                <div class="dash-card-title">🗓️ Day of the Week Spending Pattern</div>
+              </div>
+              <div class="trend-chart-container" id="analytics-dow-bars" style="height: 160px;">
+                <!-- Dynamically injected -->
+              </div>
+            </div>
+
+            <div class="dash-card">
+              <div class="dash-card-header">
+                <div class="dash-card-title">💡 Budget Projection</div>
+              </div>
+              <div style="display: flex; flex-direction: column; gap: 14px; margin-top: 8px;">
+                <div>
+                  <div style="font-size: 12px; color: var(--muted-text);">Estimated Month Total</div>
+                  <div id="analytics-projected-spend" style="font-size: 26px; font-weight: 800; color: var(--warning); margin-top: 2px;">₹0</div>
+                </div>
+                <div style="font-size: 12px; color: var(--muted-text); line-height: 1.5;">
+                  Based on your tracking momentum this month, keeping Sunday outside dinners moderate will save you approximately ₹300-₹600 monthly.
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ============================================================= -->
+        <!-- VIEW 6: SETTINGS -->
+        <!-- ============================================================= -->
+        <section class="view-section" id="view-settings">
+          <div class="view-title-row">
+            <div>
+              <h2 class="view-main-title">⚙️ Preferences & Configuration</h2>
+              <div class="view-main-subtitle">Configure your profile, standard mess rates, notification alarms, and data backup.</div>
+            </div>
+          </div>
+
+          <div class="settings-grid">
+            
+            <!-- Card 1: Rates & Profile -->
+            <div class="dash-card">
+              <div class="dash-card-header">
+                <div class="dash-card-title">👤 Profile & Pricing Rates</div>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label" for="settings-user-name">Your Name</label>
+                <input type="text" id="settings-user-name" class="form-input" placeholder="e.g. Sowmya">
+              </div>
+
+              <div class="form-group">
+                <label class="form-label" for="settings-price-breakfast">Breakfast Rate (₹)</label>
+                <input type="number" id="settings-price-breakfast" class="form-input" min="0">
+              </div>
+
+              <div class="form-group">
+                <label class="form-label" for="settings-price-lunch">Lunch Rate (₹)</label>
+                <input type="number" id="settings-price-lunch" class="form-input" min="0">
+              </div>
+
+              <div class="form-group">
+                <label class="form-label" for="settings-price-dinner">Dinner Rate (₹)</label>
+                <input type="number" id="settings-price-dinner" class="form-input" min="0">
+              </div>
+
+              <button class="header-btn header-btn-primary" id="save-settings-btn" style="width: 100%; justify-content: center; padding: 12px; margin-top: 8px;">
+                💾 Save Rates & Preferences
+              </button>
+            </div>
+
+            <!-- Card 2: Notifications & Backup -->
+            <div class="dash-card">
+              <div class="dash-card-header">
+                <div class="dash-card-title">🔔 Smart Meal Reminders</div>
+              </div>
+
+              <div class="toggle-switch-row">
+                <div>
+                  <div style="font-weight: 600; font-size: 13px;">Enable Reminders</div>
+                  <div style="font-size: 11px; color: var(--muted-text);">Receive desktop and audio chimes</div>
+                </div>
+                <input type="checkbox" id="settings-notif-switch" style="width: 20px; height: 20px; accent-color: var(--primary);">
+              </div>
+
+              <div class="form-group" style="margin-top: 14px;">
+                <label class="form-label">Breakfast Reminder Time (24h)</label>
+                <input type="text" id="settings-time-breakfast" class="form-input" placeholder="10:00">
+              </div>
+
+              <div class="form-group">
+                <label class="form-label">Lunch Reminder Time (24h)</label>
+                <input type="text" id="settings-time-lunch" class="form-input" placeholder="14:30">
+              </div>
+
+              <div class="form-group">
+                <label class="form-label">Dinner Reminder Time (24h)</label>
+                <input type="text" id="settings-time-dinner" class="form-input" placeholder="22:00">
+              </div>
+
+              <div class="toggle-switch-row">
+                <div>
+                  <div style="font-weight: 600; font-size: 13px;">Evening Inactivity Check</div>
+                  <div style="font-size: 11px; color: var(--muted-text);">Alert if 0 meals logged today</div>
+                </div>
+                <input type="checkbox" id="settings-inact-switch" style="width: 20px; height: 20px; accent-color: var(--warning);">
+              </div>
+
+              <div class="form-group" style="margin-top: 14px;">
+                <label class="form-label">Inactivity Check Time (24h)</label>
+                <input type="text" id="settings-time-inactivity" class="form-input" placeholder="21:30">
+              </div>
+
+              <div style="display: flex; gap: 10px; margin-top: 12px;">
+                <button class="header-btn header-btn-ghost" id="test-notification-btn" style="flex: 1; justify-content: center;">
+                  🔔 Test Alert
+                </button>
+                <button class="header-btn header-btn-ghost" id="export-json-btn" style="flex: 1; justify-content: center;">
+                  📦 Export Backup
+                </button>
+              </div>
+
+              <div style="margin-top: 14px;">
+                <label class="form-label">Restore from JSON Backup</label>
+                <input type="file" id="import-json-file" accept=".json" class="form-input" style="padding: 6px;">
+              </div>
+
+            </div>
+
+          </div>
+        </section>
+
+      </main>
+    </div>
+  </div>
+
+  <!-- ================================================================= -->
+  <!-- PAST-DATE MEAL EDITOR MODAL -->
+  <!-- ================================================================= -->
+  <div class="modal-overlay" id="date-editor-modal">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 class="modal-title">📅 Log / Edit Meal Record</h3>
+        <button class="modal-close-btn" id="modal-close-btn">&times;</button>
+      </div>
+
+      <form id="modal-date-form">
+        <div class="form-group">
+          <label class="form-label" for="modal-date-input">Select Date</label>
+          <input type="date" id="modal-date-input" class="form-input" required>
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 10px; margin: 16px 0;">
+          <label style="display: flex; align-items: center; gap: 10px; font-weight: 600; cursor: pointer;">
+            <input type="checkbox" id="modal-cb-breakfast" style="width: 18px; height: 18px; accent-color: var(--primary);">
+            <span>🍳 Breakfast</span>
+          </label>
+
+          <label style="display: flex; align-items: center; gap: 10px; font-weight: 600; cursor: pointer;">
+            <input type="checkbox" id="modal-cb-lunch" style="width: 18px; height: 18px; accent-color: var(--primary);">
+            <span>🍛 Lunch</span>
+          </label>
+
+          <label style="display: flex; align-items: center; gap: 10px; font-weight: 600; cursor: pointer;">
+            <input type="checkbox" id="modal-cb-dinner" style="width: 18px; height: 18px; accent-color: var(--primary);">
+            <span>🌙 Dinner</span>
+          </label>
+        </div>
+
+        <div class="form-group" id="modal-sunday-row" style="display: none;">
+          <label class="form-label" for="modal-outside-dinner" style="color: var(--warning);">Sunday Outside Dinner Amount (₹)</label>
+          <input type="number" id="modal-outside-dinner" class="form-input" placeholder="e.g. 120" min="0">
+        </div>
+
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 24px;">
+          <button type="button" class="header-btn header-btn-ghost action-btn-danger" id="modal-delete-btn" style="display: none;">
+            🗑️ Delete
+          </button>
+          
+          <div style="display: flex; gap: 10px; margin-left: auto;">
+            <button type="button" class="header-btn header-btn-ghost" id="modal-cancel-btn">Cancel</button>
+            <button type="submit" class="header-btn header-btn-primary">💾 Save Record</button>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Toast Notification Anchor -->
+  <div id="toast-container" class="toast-container"></div>
+
+  <!-- Main JavaScript App -->
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>
